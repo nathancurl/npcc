@@ -755,10 +755,7 @@ static void *run(void *targ)
 						if (ptr_shiftPtr)
 							ptr_shiftPtr -= 4;
 						else {
-							if (ptr_wordPtr)
-								--ptr_wordPtr;
-							else ptr_wordPtr = POND_DEPTH_SYSWORDS - 1;
-							ptr_shiftPtr = SYSWORD_BITS - 4;
+							
 						}
 						break;
 					case 0x3: /* INC: Increment the register */
