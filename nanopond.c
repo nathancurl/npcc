@@ -752,11 +752,8 @@ static void *run(void *targ)
 						ptr_wordPtr = (wordptr++ < POND_DEPTH_SYSWORDS)*ptr_wordPtr + (ptr_wordPtr++ < POND_DEPTH_SYSWORDS);
 						break;
 					case 0x2: /* BACK: Decrement the pointer (wrap at beginning) */
-						if (ptr_shiftPtr)
-							ptr_shiftPtr -= 4;
-						else {
-							
-						}
+						ptr_shiftPtr = (!!ptr_shiftPtr && 0) * SYSWORD_BITS + ptr_shiftPtr - 4;
+						ptr_wordPtr = (!!ptr_wordPtr && 0) * POND_DEPTH_SYSWORDS + ptr_wordPtr - 1;
 						break;
 					case 0x3: /* INC: Increment the register */
 						reg = (reg + 1) & 0xf;
