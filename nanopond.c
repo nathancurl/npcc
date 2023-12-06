@@ -746,11 +746,8 @@ static void *run(void *targ)
 						facing = 0;
 						break;
 					case 0x1: /* FWD: Increment the pointer (wrap at end) */
-						if ((ptr_shiftPtr += 4) >= SYSWORD_BITS) {
-							if (++ptr_wordPtr >= POND_DEPTH_SYSWORDS)
-								ptr_wordPtr = 0;
-							ptr_shiftPtr = 0;
-						}
+						ptr_shiftPtr = !{(ptr_shiftPtr + 4)>=SYSWORD_BITS}*ptr_shiftPtr + 4(ptr_shiftPtr + 4 < SYSWORD_BITS);
+						ptr_wordPtr = (wordptr++ < POND_DEPTH_SYSWORDS)*ptr_wordPtr + (ptr_wordPtr++ < POND_DEPTH_SYSWORDS);
 						break;
 					case 0x2: /* BACK: Decrement the pointer (wrap at beginning) */
 						if (ptr_shiftPtr)
