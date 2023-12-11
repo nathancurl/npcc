@@ -996,8 +996,7 @@ int main()
 	}
 #endif /* USE_SDL */
  
-	/* Clear the pond and initialize all genomes
-	 * to 0xffff... */
+	/* Clear the pond and initialize all genomes * to 0xffff... */
 	for(x=0;x<POND_SIZE_X;++x) {
 		for(y=0;y<POND_SIZE_Y;++y) {
 			pond[x][y].ID = 0;
@@ -1031,3 +1030,4 @@ int main()
 
 	return 0;
 }
+
