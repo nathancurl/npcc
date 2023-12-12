@@ -23,7 +23,7 @@
  *       is a variation on the original EAT that is easier for cells to
  *       make use of.
  * 1.5 - Made some other instruction changes such as XCHG and added a
- *       penalty for failed KILL attempts. Also made access permissions
+ *       penalty for failed KILL attempts. Also made access_pos permissions
  *       stochastic.
  * 1.6 - Made cells all start facing in direction 0. This removes a bit
  *       of artificiality and requires cells to evolve the ability to
@@ -106,7 +106,7 @@
  * ID of the cell that generated the output and generation is set to
  * one plus the generation of the parent.
  *
- * A cell is permitted to access a neighboring cell if:
+ * A cell is permitted to access_pos a neighboring cell if:
  *    - That cell's energy is zero
  *    - That cell's parentID is zero
  *    - That cell's logo (remember?) matches the trying cell's "guess"
@@ -115,7 +115,7 @@
  * real living cells to always replace them or eat them.
  *
  * The "guess" is merely the value of the register at the time that the
- * access attempt occurs.
+ * access_pos attempt occurs.
  *
  * Permissions determine whether or not an offspring can take the place
  * of the contents of a cell and also whether or not the cell is allowed
@@ -142,7 +142,7 @@
  * most certainly *not* random, things will start to get more and more
  * ordered and complex (in the functional sense). There are two commodities
  * that are scarce in the pond: space in the NxN grid and energy. Evolving
- * cells compete for access to both.
+ * cells compete for access_pos to both.
  *
  * If you want more implementation details such as the actual instruction
  * set, read the source. It's well commented and is not that hard to
@@ -695,8 +695,54 @@ static void *run(void *targ)
 				* set is 0xd, 0xe
 				*/
 				tmpptr = getNeighbor(x,y,facing);
-				access_var_neg = accessAllowed(tmpptr,reg,0);
-				access_var_pos = accessAllowed(tmpptr,reg,1);
+				int access_neg = accessAllowed(tmpptr,reg,0);
+				int access_pos = accessAllowed(tmpptr,reg,1);
+				int access_neg_used = 0;
+				int access_pos_used = 0;
+
+
+				statCounters.viableCellsKilled=
+				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xf)*(statCounters.viableCellsKilled)+
+				((inst == 0xd)*(statCounters.viableCellsKilled+(access_neg)*(tmpptr->generation>2)))+
+				((inst == 0xe)*(statCounters.viableCellsKilled+(access_pos)*(tmpptr->generation>2)));
+
+				tmpptr->genome[0]=
+				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[0])+
+				((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
+
+				tmpptr->genome[1]=
+				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[1])+
+				((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
+
+				tmpptr->ID=
+				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->ID)+
+				((inst == 0xd)*(tmpptr->ID * !(access_neg)+ (access_neg)*cellIdCounter));
+
+				tmpptr->parentID=
+				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->parentID)+
+				((inst == 0xd)*(tmpptr->parentID * !(access_neg)));
+
+				tmpptr->lineage=
+				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->lineage)+
+				((inst == 0xd)*(tmpptr->lineage * !(access_neg) + (access_neg)*cellIdCounter));
+
+				cellIdCounter=
+				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(cellIdCounter)+
+				((inst == 0xd)*(cellIdCounter * !(access_neg) + (access_neg)* cellIdCounter));
+
+				tmp =
+				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xf)*(tmp)+
+				((inst == 0xc)*(reg))+
+				((inst == 0xd)*((access_neg) + (tmpptr->generation>2)*!(access_neg)*(pptr->energy / FAILED_KILL_PENALTY)))+
+				((inst == 0xe)* (pptr->energy + tmpptr->energy));
+
+				pptr->energy=
+				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(pptr->energy)+
+				((inst == 0xd)*(pptr->energy+!(access_neg)*(tmpptr->generation>2)*(-pptr->energy) + !(access_neg)*(tmpptr->generation>2)*(pptr->energy-tmp)));
+
+				tmpptr->generation=
+				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->generation)+
+				((inst == 0xd)*(tmpptr->generation * (access_neg)));
 
 				/* Keep track of execution frequencies for each instruction */
 				statCounters.instructionExecutions[inst] += 1.0;
@@ -742,32 +788,32 @@ static void *run(void *targ)
 					case 0xc: /* XCHG: Skip next instruction and exchange value of register with it */
                         //wordPtr=wordPtr*((shiftPtr+4<SYSWORD_BITS)||(wordPtr+1<POND_DEPTH_SYSWORDS))+((shiftPtr+4>=SYSWORD_BITS)&&(wordPtr+1<POND_DEPTH_SYSWORDS))+EXEC_START_WORD*((wordPtr+1>=POND_DEPTH_SYSWORDS)&&(shiftPtr+4>=SYSWORD_BITS));
                         //shiftPtr=(shiftPtr+4)+(shiftPtr+4>=SYSWORD_BITS)*(-shiftPtr-4);
-						tmp = reg;
+						//tmp = reg;
 						reg = (pptr->genome[wordPtr] >> shiftPtr) & 0xf;
 						pptr->genome[wordPtr]=((pptr->genome[wordPtr]&~(((uintptr_t)0xf) << shiftPtr))|tmp << shiftPtr);
 						currentWord = pptr->genome[wordPtr];
 						break;
 					case 0xd: /* KILL: Blow away neighboring cell if allowed with penalty on failure */
 						//tmpptr = getNeighbor(x,y,facing);
-						//int access_var = accessAllowed(tmpptr,reg,0);
-                        statCounters.viableCellsKilled=statCounters.viableCellsKilled+(access_var)*(tmpptr->generation>2);
-                        tmpptr->genome[0] = tmpptr->genome[0]*!(access_var)+(access_var)*~((uintptr_t)0);
-                        tmpptr->genome[1] = tmpptr->genome[0]*!(access_var)+(access_var)*~((uintptr_t)0);
-                        tmpptr->ID = tmpptr->ID * !(access_var)+ (access_var)*cellIdCounter;
-                        tmpptr->parentID = tmpptr->parentID * !(access_var);
-                        tmpptr->lineage = tmpptr->lineage * !(access_var) + (access_var)*cellIdCounter;
-                        cellIdCounter=cellIdCounter * !(access_var) + (access_var)* cellIdCounter;
-                        tmp = (access_var) + (tmpptr->generation>2)*!(access_var)*(pptr->energy / FAILED_KILL_PENALTY);
-                        pptr->energy = pptr->energy+!(access_var)*(tmpptr->generation>2)*(-pptr->energy) + !(access_var)*(tmpptr->generation>2)*(pptr->energy-tmp);
-						tmpptr->generation = tmpptr->generation * (access_var);
+						//int access_neg = accessAllowed(tmpptr,reg,0);
+                        //statCounters.viableCellsKilled=statCounters.viableCellsKilled+(access_neg)*(tmpptr->generation>2);
+                        //tmpptr->genome[0] = tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0);
+                        //tmpptr->genome[1] = tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0);
+                        //tmpptr->ID = tmpptr->ID * !(access_neg)+ (access_neg)*cellIdCounter;
+                        //tmpptr->parentID = tmpptr->parentID * !(access_neg);
+                        //tmpptr->lineage = tmpptr->lineage * !(access_neg) + (access_neg)*cellIdCounter;
+                        //cellIdCounter=cellIdCounter * !(access_neg) + (access_neg)* cellIdCounter;
+                        //tmp = (access_neg) + (tmpptr->generation>2)*!(access_neg)*(pptr->energy / FAILED_KILL_PENALTY);
+                        //pptr->energy = pptr->energy+!(access_neg)*(tmpptr->generation>2)*(-pptr->energy) + !(access_neg)*(tmpptr->generation>2)*(pptr->energy-tmp);
+						//tmpptr->generation = tmpptr->generation * (access_neg);
                         break;
 					case 0xe: /* SHARE: Equalize energy between self and neighbor if allowed */
-						tmpptr = getNeighbor(x,y,facing);
-						int access = accessAllowed(tmpptr,reg,1);
-						tmp = pptr->energy + tmpptr->energy;
-						statCounters.viableCellShares += access * (tmpptr->generation > 2);
-						tmpptr->energy = (access * (tmp / 2) + (1 - access) * tmpptr->energy);
-						pptr->energy = (access * (tmp - (access * (tmp / 2) + (1 - access) * tmpptr->energy)) + (1 - access) * pptr->energy);
+						//tmpptr = getNeighbor(x,y,facing);
+						//int access_pos = accessAllowed(tmpptr,reg,1);
+						//tmp = pptr->energy + tmpptr->energy;
+						//statCounters.viableCellShares += access_pos * (tmpptr->generation > 2);
+						tmpptr->energy = (access_pos * (tmp / 2) + (1 - access_pos) * tmpptr->energy);
+						pptr->energy = (access_pos * (tmp - (access_pos * (tmp / 2) + (1 - access_pos) * tmpptr->energy)) + (1 - access_pos) * pptr->energy);
 						break; 
 					case 0xf: /* STOP: End execution */
 						break;
@@ -794,7 +840,7 @@ static void *run(void *targ)
             shiftPtr=(shiftPtr+4)+(shiftPtr+4>=SYSWORD_BITS)*(-shiftPtr-4);
         }   
 
-		/* Copy outputBuf into neighbor if access is permitted and there
+		/* Copy outputBuf into neighbor if access_pos is permitted and there
 		 * is energy there to make something happen. There is no need
 		 * to copy to a cell with no energy, since anything copied there
 		 * would never be executed and then would be replaced with random
