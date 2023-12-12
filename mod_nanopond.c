@@ -455,26 +455,6 @@ static inline int accessAllowed(struct Cell *const c2, const uintptr_t c1guess, 
     uintptr_t random = (uintptr_t)(getRandom() & 0xf);
     return ((((random >= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & sense) | (((random <= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & ~sense));
 }
-/*
-static inline int accessAllowedSwitch(struct Cell *const c2, const uintptr_t c1guess, int sense)
-{
-    // Store the current 'in' index and last random number
-    int prev_in = in;
-    uintptr_t prev_last_random_number = last_random_number;
-
-    // Get a random number
-    uintptr_t random = (uintptr_t)(getRandom() & 0xf);
-
-    // Calculate the accessAllowed result
-    int result = ((((random >= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & sense) | (((random <= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & ~sense));
-
-    // Roll back the 'in' index and replace the last random number in the buffer
-    in = prev_in;
-    buffer[in] = prev_last_random_number;
-
-    return result;
-}
-*/
 
 volatile int exitNow = 0;
 
@@ -715,9 +695,13 @@ static void *run(void *targ)
 				* set is 0xd, 0xe
 				*/
 				tmpptr = getNeighbor(x,y,facing);
-				
+				access_var_neg = accessAllowed(tmpptr,reg,0);
+				access_var_pos = accessAllowed(tmpptr,reg,1);
+
 				/* Keep track of execution frequencies for each instruction */
 				statCounters.instructionExecutions[inst] += 1.0;
+
+				
 
 				switch(inst) {
 					case 0x0: /* ZERO: Zero VM state registers */
@@ -756,8 +740,8 @@ static void *run(void *targ)
 						//facing = reg & 3;
 						break;
 					case 0xc: /* XCHG: Skip next instruction and exchange value of register with it */
-                        wordPtr=wordPtr*((shiftPtr+4<SYSWORD_BITS)||(wordPtr+1<POND_DEPTH_SYSWORDS))+((shiftPtr+4>=SYSWORD_BITS)&&(wordPtr+1<POND_DEPTH_SYSWORDS))+EXEC_START_WORD*((wordPtr+1>=POND_DEPTH_SYSWORDS)&&(shiftPtr+4>=SYSWORD_BITS));
-                        shiftPtr=(shiftPtr+4)+(shiftPtr+4>=SYSWORD_BITS)*(-shiftPtr-4);
+                        //wordPtr=wordPtr*((shiftPtr+4<SYSWORD_BITS)||(wordPtr+1<POND_DEPTH_SYSWORDS))+((shiftPtr+4>=SYSWORD_BITS)&&(wordPtr+1<POND_DEPTH_SYSWORDS))+EXEC_START_WORD*((wordPtr+1>=POND_DEPTH_SYSWORDS)&&(shiftPtr+4>=SYSWORD_BITS));
+                        //shiftPtr=(shiftPtr+4)+(shiftPtr+4>=SYSWORD_BITS)*(-shiftPtr-4);
 						tmp = reg;
 						reg = (pptr->genome[wordPtr] >> shiftPtr) & 0xf;
 						pptr->genome[wordPtr]=((pptr->genome[wordPtr]&~(((uintptr_t)0xf) << shiftPtr))|tmp << shiftPtr);
@@ -765,7 +749,7 @@ static void *run(void *targ)
 						break;
 					case 0xd: /* KILL: Blow away neighboring cell if allowed with penalty on failure */
 						//tmpptr = getNeighbor(x,y,facing);
-						int access_var = accessAllowed(tmpptr,reg,0);
+						//int access_var = accessAllowed(tmpptr,reg,0);
                         statCounters.viableCellsKilled=statCounters.viableCellsKilled+(access_var)*(tmpptr->generation>2);
                         tmpptr->genome[0] = tmpptr->genome[0]*!(access_var)+(access_var)*~((uintptr_t)0);
                         tmpptr->genome[1] = tmpptr->genome[0]*!(access_var)+(access_var)*~((uintptr_t)0);
@@ -778,7 +762,7 @@ static void *run(void *targ)
 						tmpptr->generation = tmpptr->generation * (access_var);
                         break;
 					case 0xe: /* SHARE: Equalize energy between self and neighbor if allowed */
-						//tmpptr = getNeighbor(x,y,facing);
+						tmpptr = getNeighbor(x,y,facing);
 						int access = accessAllowed(tmpptr,reg,1);
 						tmp = pptr->energy + tmpptr->energy;
 						statCounters.viableCellShares += access * (tmpptr->generation > 2);
