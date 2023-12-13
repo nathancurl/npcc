@@ -288,16 +288,6 @@ void precalculate_random_numbers() {
         buffer[i] = getRandomPre(1);
     }
 }
-/*
-static inline uintptr_t getRandomRollback(uintptr_t rollback) {
-    uintptr_t num = buffer[in];
-    last_random_number = num;  // Store the last random number
-    uintptr_t new_num = getRandomPre(rollback);
-    buffer[in] = (new_num & -rollback) | (num & ~-rollback);
-    in = ((in + 1) & -rollback) | (in & ~-rollback);
-    return num;
-}
-*/
 static inline uintptr_t getRandomRollback(uintptr_t rollback) {
     uintptr_t num = buffer[in];
     last_random_number = num;  // Store the last random number
@@ -612,23 +602,23 @@ static void *run(void *targ)
 			 * replication: insertions, deletions, duplications of entire
 			 * ranges of the genome, etc. */
 
-			
+			/*
 			if ((getRandomRollback(1) & 0xffffffff) < MUTATION_RATE) {
 				tmp = getRandomRollback(1); // Call getRandom() only once for speed 
 				if (tmp & 0x80) // Check for the 8th bit to get random boolean 
 					inst = tmp & 0xf; // Only the first four bits are used here 
 				else reg = tmp & 0xf;
 			}
-			
+			*/
 
-			/*
+			
 			uintptr_t mutation_occurred = (getRandomRollback(1) & 0xffffffff) < MUTATION_RATE;
 			uintptr_t tmp = getRandomRollback(mutation_occurred) * mutation_occurred;
 			uintptr_t is_inst = (tmp & 0x80) >> 7; // Shift right by 7 to get a 1 or 0
-			uintptr_t is_reg = ~is_inst & 0x1; // Invert is_inst and mask with 0x1 to get a 1 or 0
+			uintptr_t is_reg = !!(!is_inst); // Use double negation to ensure is_reg is either 1 or 0
 			inst = (tmp & 0xf) * is_inst + inst * (!is_inst); // Update inst only if is_inst is 1
 			reg = (tmp & 0xf) * is_reg + reg * (!is_reg); // Update reg only if is_reg is 1
-			*/
+			
 
 			/* Each instruction processed costs one unit of energy */
 			--pptr->energy;
@@ -818,7 +808,7 @@ static void *run(void *targ)
 				((inst==0x3)*((reg + 1) & 0xf)) +
 				((inst==0x4)*((reg - 1) & 0xf)) +
 				((inst==0x5)*((pptr->genome[ptr_wordPtr] >> ptr_shiftPtr) & 0xf)) +
-				((inst==0x7)*((outputBuf[ptr_wordPtr] >> ptr_shiftPtr) & 0xf))+
+				((inst==0x7)*((outputBuf[ptr_wordPtr] >> ptr_shiftPtr) & 0xf)) +
 				((inst==0xc)*((pptr->genome[wordPtr] >> shiftPtr) & 0xf));
 
 				pptr->genome[wordPtr]=
@@ -840,7 +830,6 @@ static void *run(void *targ)
 				
 				/* Keep track of execution frequencies for each instruction */
 				statCounters.instructionExecutions[inst] += 1.0;
-
 			}
 			
 			/* Advance the shift and word pointers, and loop around
