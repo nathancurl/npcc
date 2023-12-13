@@ -458,26 +458,6 @@ static inline int accessAllowed(struct Cell *const c2, const uintptr_t c1guess, 
 	//return sense ? (((getRandomRollback(1) & 0xf) >= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)])||(!c2->parentID)) : (((getRandomRollback(1) & 0xf) <= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)])||(!c2->parentID));
 	return ((((random >= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & sense) | (((random <= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & ~sense));
 }
-/*
-static inline int accessAllowedSwitch(struct Cell *const c2, const uintptr_t c1guess, int sense)
-{
-    // Store the current 'in' index and last random number
-    int prev_in = in;
-    uintptr_t prev_last_random_number = last_random_number;
-
-    // Get a random number
-    uintptr_t random = (uintptr_t)(getRandom() & 0xf);
-
-    // Calculate the accessAllowed result
-    int result = ((((random >= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & sense) | (((random <= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & ~sense));
-
-    // Roll back the 'in' index and replace the last random number in the buffer
-    in = prev_in;
-    buffer[in] = prev_last_random_number;
-
-    return result;
-}
-*/
 
 volatile int exitNow = 0;
 
@@ -602,24 +582,24 @@ static void *run(void *targ)
 			 * replication: insertions, deletions, duplications of entire
 			 * ranges of the genome, etc. */
 
-			/*
+			
 			if ((getRandomRollback(1) & 0xffffffff) < MUTATION_RATE) {
 				tmp = getRandomRollback(1); // Call getRandom() only once for speed 
 				if (tmp & 0x80) // Check for the 8th bit to get random boolean 
 					inst = tmp & 0xf; // Only the first four bits are used here 
 				else reg = tmp & 0xf;
 			}
-			*/
-
 			
+
+			/*
 			uintptr_t mutation_occurred = (getRandomRollback(1) & 0xffffffff) < MUTATION_RATE;
-			uintptr_t new_tmp = getRandomRollback(mutation_occurred) * mutation_occurred;
+			uintptr_t new_tmp = getRandomRollback(mutation_occurred);
 			uintptr_t tmp = new_tmp * mutation_occurred + tmp * (!mutation_occurred);
 			uintptr_t is_inst = (tmp & 0x80) >> 7; // Shift right by 7 to get a 1 or 0
 			uintptr_t is_reg = !(is_inst); // Use negation to ensure is_reg is either 1 or 0
 			inst = (tmp & 0xf) * is_inst + inst * (!is_inst); // Update inst only if is_inst is 1
 			reg = (tmp & 0xf) * is_reg + reg * (!is_reg); // Update reg only if is_reg is 1
-			
+			*/
 
 			/* Each instruction processed costs one unit of energy */
 			--pptr->energy;
@@ -846,32 +826,14 @@ static void *run(void *targ)
                 +
                 EXEC_START_WORD*((wordPtr+1>=POND_DEPTH_SYSWORDS)&&(shiftPtr+4>=SYSWORD_BITS)))*!skip + wordPtr*skip;
 
-            //currentWord gets incremented when the shiftptr is greater than
-            //SYSWORD_BITS, and it's time to move to the next word
             currentWord=(currentWord*(shiftPtr+4<SYSWORD_BITS)
                 +
                 (pptr->genome[wordPtr])*(shiftPtr+4>=SYSWORD_BITS))*!skip
                 + currentWord*skip;
             
-            //shiftPtr shifts the current nibble being read by the machine
-            //It incrememnts four bits until it gets past SYSWORD_BITS, the 
-            //number of bits in a word, and then resets at either 0 or
-            //EXEC_START_BIT
             shiftPtr=((shiftPtr+4)
                     +
                     (shiftPtr+4>=SYSWORD_BITS)*(-shiftPtr-4))*!skip+shiftPtr*skip;
-            //+
-                //(EXEC_START_BIT)*(wordPtr+1>=POND_DEPTH_SYSWORDS)
-                //*(shiftPtr+4>=SYSWORD_BITS);
-            /*
-            if ((shiftPtr += 4) >= SYSWORD_BITS) {
-				if (++wordPtr >= POND_DEPTH_SYSWORDS) {
-					wordPtr = EXEC_START_WORD;
-					shiftPtr = EXEC_START_BIT;
-				} else shiftPtr = 0;
-				currentWord = pptr->genome[wordPtr];
-			}
-            */
         }   
 
 		/* Copy outputBuf into neighbor if access is permitted and there
@@ -898,7 +860,6 @@ static void *run(void *targ)
 			}
 		}
 	}
-
 	return (void *)0;
 }
 
