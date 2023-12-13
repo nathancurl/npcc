@@ -613,7 +613,7 @@ static void *run(void *targ)
 
 			
 			uintptr_t mutation_occurred = (getRandomRollback(1) & 0xffffffff) < MUTATION_RATE;
-			uintptr_t new_tmp = getRandomRollback(mutation_occurred);
+			uintptr_t new_tmp = getRandomRollback(mutation_occurred) * mutation_occurred;
 			uintptr_t tmp = new_tmp * mutation_occurred + tmp * (!mutation_occurred);
 			uintptr_t is_inst = (tmp & 0x80) >> 7; // Shift right by 7 to get a 1 or 0
 			uintptr_t is_reg = !(is_inst); // Use negation to ensure is_reg is either 1 or 0
