@@ -611,12 +611,24 @@ static void *run(void *targ)
 			 * it can have all manner of different effects on the end result of
 			 * replication: insertions, deletions, duplications of entire
 			 * ranges of the genome, etc. */
+
+			/*
 			if ((getRandomRollback(1) & 0xffffffff) < MUTATION_RATE) {
-				tmp = getRandomRollback(1); /* Call getRandom() only once for speed */
-				if (tmp & 0x80) /* Check for the 8th bit to get random boolean */
-					inst = tmp & 0xf; /* Only the first four bits are used here */
+				tmp = getRandomRollback(1); // Call getRandom() only once for speed 
+				if (tmp & 0x80) // Check for the 8th bit to get random boolean 
+					inst = tmp & 0xf; // Only the first four bits are used here 
 				else reg = tmp & 0xf;
 			}
+			*/
+
+			
+			uintptr_t mutation_occurred = (getRandomRollback(1) & 0xffffffff) < MUTATION_RATE;
+			uintptr_t tmp = getRandomRollback(mutation_occurred) * mutation_occurred;
+			uintptr_t is_inst = (tmp & 0x80) >> 7; // Shift right by 7 to get a 1 or 0
+			uintptr_t is_reg = ~is_inst & 0x1; // Invert is_inst and mask with 0x1 to get a 1 or 0
+			inst = (tmp & 0xf) * is_inst + inst * (!is_inst); // Update inst only if is_inst is 1
+			reg = (tmp & 0xf) * is_reg + reg * (!is_reg); // Update reg only if is_reg is 1
+			
 
 			/* Each instruction processed costs one unit of energy */
 			--pptr->energy;
