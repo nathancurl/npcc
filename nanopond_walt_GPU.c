@@ -54,7 +54,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <cuda.h>
+
 
 #define BUFFER_SIZE 1000  // Size of the circular buffer
 
