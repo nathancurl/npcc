@@ -3,8 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-
+#include <cuda.h>
 
 /* Core execution loop */
 __global__ void whileLoop(){

@@ -1,6 +1,3 @@
-
-
-
 switch(inst) {
 					case 0x0: /* ZERO: Zero VM state registers */
 						reg = 0;
