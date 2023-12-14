@@ -61,7 +61,8 @@ int stop;
 				++falseLoopDepth;
 			else if (inst == 0xa) /* Decrement on REP */
 				--falseLoopDepth;
-		} else {
+		}
+			else {
 			/* If we're not in a false LOOP/REP, execute normally */
 			
 			/* Keep track of execution frequencies for each instruction */
@@ -208,5 +209,6 @@ int stop;
 
 int run{
 	whileLoop<<<1,1>>>();
+	cudaDeviceSynchronize();
 	return 0;
 }
