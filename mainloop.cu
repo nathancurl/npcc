@@ -527,7 +527,7 @@ int cudaMain()
             *d_inst,  *d_tmp,  *d_ptr_wordPtr,  *d_ptr_shiftPtr, *d_reg,  *d_facing,  *d_loopStack_wordPtr,  *d_loopStack_shiftPtr, *d_loopStackPtr,  
             *d_falseLoopDepth,  *d_stop,  *d_skip,*d_access_neg_used,  *d_access_pos_used,  *d_access_neg,  *d_access_pos,*d_pptr, *d_tmpptr)
         }
-        // TODO: memcopy values and call doReport()
+        doReport(n);
     }
 
 	// Copy data from host to device
@@ -560,11 +560,31 @@ int cudaMain()
 	cudaMemcpy(d_tmpptr, tmpptr, sizeof(struct Cell), cudaMemcpyHostToDevice);
 
 	// Free memory on the GPU
-	cudaFree(d_outputBuf);
-	cudaFree(d_loopStack_wordPtr);
-	cudaFree(d_loopStack_shiftPtr);
-	cudaFree(d_stop);
-	cudaFree(d_skip);
-	cudaFree(d_access_neg_used);
-	cudaFree(d_access_pos_used);
+	cudaFree(d_threadNo);
+    cudaFree(d_x);
+    cudaFree(d_y);
+    cudaFree(d_i);
+    cudaFree(d_clock);
+    cudaFree(d_outputBuf);
+    cudaFree(d_currentWord);
+    cudaFree(d_wordPtr);
+    cudaFree(d_shiftPtr);
+    cudaFree(d_inst);
+    cudaFree(d_tmp);
+    cudaFree(d_ptr_wordPtr);
+    cudaFree(d_ptr_shiftPtr);
+    cudaFree(d_reg);
+    cudaFree(d_facing);
+    cudaFree(d_loopStack_wordPtr);
+    cudaFree(d_loopStack_shiftPtr);
+    cudaFree(d_loopStackPtr);
+    cudaFree(d_falseLoopDepth);
+    cudaFree(d_stop);
+    cudaFree(d_skip);
+    cudaFree(d_access_neg_used);
+    cudaFree(d_access_pos_used);
+    cudaFree(d_access_neg);
+    cudaFree(d_access_pos);
+    cudaFree(d_pptr);
+    cudaFree(d_tmpptr);
 }
