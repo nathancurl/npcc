@@ -68,14 +68,14 @@
 #include <time.h>
 #include <cuda.h>
 
-__managed__ static uintptr_t buffer[BUFFER_SIZE];
-__managed__ static int in = 0;
-__managed__ static uintptr_t last_random_number;
+__managed__ uintptr_t buffer[BUFFER_SIZE];
+__managed__ int in = 0;
+__managed__ uintptr_t last_random_number;
 
 __managed__ volatile uint64_t prngState[2];
 
 /* Number of bits set in binary numbers 0000 through 1111 */
-__managed__ static const uintptr_t BITS_IN_FOURBIT_WORD[16] = { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4 };
+__managed__ uintptr_t BITS_IN_FOURBIT_WORD[16] = { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4 };
 
 /**
  * Structure for a cell in the pond
@@ -104,12 +104,12 @@ struct Cell
 };
 
 /* The pond is a 2D array of cells */
-static struct Cell pond[POND_SIZE_X][POND_SIZE_Y];
+__managed__ struct Cell pond[POND_SIZE_X][POND_SIZE_Y];
 
 /* This is used to generate unique cell IDs */
-__managed__ static volatile uint64_t cellIdCounter = 0;
+__managed__ volatile uint64_t cellIdCounter = 0;
 
-__host__ __device__ static inline uintptr_t getRandomPre(int rollback, uintptr_t *ret)
+__host__ __device__ static inline void getRandomPre(int rollback, uintptr_t *ret)
 {
 	// https://en.wikipedia.org/wiki/Xorshift#xorshift.2B
 	uint64_t x = prngState[0];
