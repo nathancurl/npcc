@@ -467,26 +467,3 @@ int main() {
 
     return 0;
 }
-
-
-int main()
-{
-
-    // Declare device pointers
-    uintptr_t *d_buffer;
-    int *d_in;
-    uintptr_t *d_last_random_number;
-    uint64_t *d_prngState;
-
-    // Allocate memory on the GPU for each variable
-    cudaMalloc(&d_33, BUFFER_SIZE * sizeof(uintptr_t));
-    cudaMalloc(&d_in, sizeof(int));
-    cudaMalloc(&d_last_random_number, sizeof(uintptr_t));
-    cudaMalloc(&d_prngState, 2 * sizeof(uint64_t));
-
-    // allocate the pond
-    struct Cell *d_pond;
-    cudaMalloc(&d_pond, POND_SIZE_X * POND_SIZE_Y * sizeof(struct Cell));
-
-	
-}
