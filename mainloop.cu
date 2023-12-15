@@ -450,7 +450,7 @@ int main() {
 
     // Reset per-report stat counters
     // Declare a device pointer for statCounters
-    struct statCounters *d_statCounters;
+    struct statCounters d_statCounters;
     struct statCounters *statCounters;
     cudaMalloc(&d_statCounters, sizeof(d_statCounters));
 
