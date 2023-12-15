@@ -241,7 +241,7 @@ static void doReport(struct Cell *pond, struct statCounters statCounter, const u
 		((uint8_t *)&statCounter)[x] = (uint8_t)0;
 }
 
-__global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState, struct statCounters statCounter) 
+__global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState, struct statCounters *statCounter) 
 {
     //const uintptr_t threadNo = (uintptr_t)targ;
     uintptr_t x,y,i;
@@ -316,7 +316,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
         * the code. :) */
     currentWord = pptr->genome[0];
     /* Keep track of how many cells have been executed */
-    statCounter.cellExecutions += 1.0;
+    statCounter->cellExecutions += 1.0;
     /* Core execution loop */
     while ((pptr->energy)&&(!stop)) {
         /* Get the next instruction */
@@ -367,7 +367,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
             access_neg_used = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe|| inst == 0xf)*(access_neg_used)+((inst == 0xd)*(1));
             accessAllowed(tmpptr,reg,0, access_neg_used, &access_neg, buffer, in, prngState);
             accessAllowed(tmpptr,reg,1, access_pos_used, &access_pos, buffer, in, prngState);
-            statCounter.viableCellsKilled=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xf)*(statCounter.viableCellsKilled)+((inst == 0xd)*(statCounter.viableCellsKilled+(access_neg)*(tmpptr->generation>2)))+((inst == 0xe)*(statCounter.viableCellsKilled+(access_pos)*(tmpptr->generation>2)));
+            statCounter->viableCellsKilled=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xf)*(statCounter->viableCellsKilled)+((inst == 0xd)*(statCounter->viableCellsKilled+(access_neg)*(tmpptr->generation>2)))+((inst == 0xe)*(statCounter->viableCellsKilled+(access_pos)*(tmpptr->generation>2)));
             tmpptr->genome[0]=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[0])+((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
             tmpptr->genome[1]=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[1])+((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
             tmpptr->ID=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->ID)+((inst == 0xd)*(tmpptr->ID * !(access_neg)+ (access_neg)*cellIdCounter));
@@ -381,7 +381,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
             tmpptr->generation = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->generation)+((inst == 0xd)*(tmpptr->generation * (access_neg)));
             tmpptr->energy=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xf)*(tmpptr->energy)+((inst == 0xe)*((access_pos * (tmp / 2) + (1 - access_pos) * tmpptr->energy)));
             /* Keep track of execution frequencies for each instruction */
-            statCounter.instructionExecutions[inst] += 1.0;
+            statCounter->instructionExecutions[inst] += 1.0;
         }
         wordPtr=(wordPtr*((shiftPtr+4<SYSWORD_BITS)||(wordPtr+1<POND_DEPTH_SYSWORDS)) + ((shiftPtr+4>=SYSWORD_BITS)&&(wordPtr+1<POND_DEPTH_SYSWORDS)) + EXEC_START_WORD*((wordPtr+1>=POND_DEPTH_SYSWORDS)&&(shiftPtr+4>=SYSWORD_BITS)))*!skip + wordPtr*skip;
         currentWord=(currentWord*(shiftPtr+4<SYSWORD_BITS)+(pptr->genome[wordPtr])*(shiftPtr+4>=SYSWORD_BITS))*!skip+ currentWord*skip;
@@ -400,7 +400,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
             if(rand) {
             /* Log it if we're replacing a viable cell */
             if (tmpptr->generation > 2)
-                ++statCounter.viableCellsReplaced;
+                ++statCounter->viableCellsReplaced;
             tmpptr->ID = ++cellIdCounter;
             tmpptr->parentID = pptr->ID;
             tmpptr->lineage = pptr->lineage; /* Lineage is copied in offspring */
@@ -450,7 +450,7 @@ int main() {
 
     // Reset per-report stat counters
     // Declare a device pointer for statCounters
-    struct statCounters d_statCounters;
+    struct statCounters *d_statCounters;
     struct statCounters *statCounters;
     cudaMalloc(&d_statCounters, sizeof(d_statCounters));
 
