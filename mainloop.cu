@@ -178,7 +178,7 @@ __device__ static inline void getNeighbor(struct Cell *pond, const uintptr_t x, 
     ret = &pond[newY * POND_SIZE_X + newX];
 }
 
-static void doReport(struct Cell *pond, struct statCounters *statCounters, const uint64_t clock)
+static void doReport(struct Cell *pond, struct statCounters *statCounter, const uint64_t clock)
 {
     static uint64_t lastTotalViableReplicators = 0;
     
@@ -212,21 +212,21 @@ static void doReport(struct Cell *pond, struct statCounters *statCounters, const
 		(uint64_t)totalActiveCells,
 		(uint64_t)totalViableReplicators,
 		(uint64_t)maxGeneration,
-		(uint64_t)statCounters.viableCellsReplaced,
-		(uint64_t)statCounters.viableCellsKilled,
-		(uint64_t)statCounters.viableCellShares
+		(uint64_t)statCounter.viableCellsReplaced,
+		(uint64_t)statCounter.viableCellsKilled,
+		(uint64_t)statCounter.viableCellShares
 		);
 	
 	/* The next 16 are the average frequencies of execution for each
 	 * instruction per cell execution. */
 	double totalMetabolism = 0.0;
 	for(x=0;x<16;++x) {
-		totalMetabolism += statCounters.instructionExecutions[x];
-		printf(",%.4f",(statCounters.cellExecutions > 0.0) ? (statCounters.instructionExecutions[x] / statCounters.cellExecutions) : 0.0);
+		totalMetabolism += statCounter.instructionExecutions[x];
+		printf(",%.4f",(statCounter.cellExecutions > 0.0) ? (statCounter.instructionExecutions[x] / statCounter.cellExecutions) : 0.0);
 	}
 	
 	/* The last column is the average metabolism per cell execution */
-	printf(",%.4f\n",(statCounters.cellExecutions > 0.0) ? (totalMetabolism / statCounters.cellExecutions) : 0.0);
+	printf(",%.4f\n",(statCounter.cellExecutions > 0.0) ? (totalMetabolism / statCounter.cellExecutions) : 0.0);
 	fflush(stdout);
 	
 	if ((lastTotalViableReplicators > 0)&&(totalViableReplicators == 0))
@@ -241,7 +241,7 @@ static void doReport(struct Cell *pond, struct statCounters *statCounters, const
 		((uint8_t *)&statCounters)[x] = (uint8_t)0;
 }
 
-__global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState, struct *statCounters) 
+__global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState, struct statCounters *statCounter) 
 {
     //const uintptr_t threadNo = (uintptr_t)targ;
     uintptr_t x,y,i;
@@ -316,7 +316,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
         * the code. :) */
     currentWord = pptr->genome[0];
     /* Keep track of how many cells have been executed */
-    statCounters.cellExecutions += 1.0;
+    statCounter.cellExecutions += 1.0;
     /* Core execution loop */
     while ((pptr->energy)&&(!stop)) {
         /* Get the next instruction */
@@ -367,7 +367,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
             access_neg_used = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe|| inst == 0xf)*(access_neg_used)+((inst == 0xd)*(1));
             accessAllowed(tmpptr,reg,0, access_neg_used, &access_neg, buffer, in, prngState);
             accessAllowed(tmpptr,reg,1, access_pos_used, &access_pos, buffer, in, prngState);
-            statCounters.viableCellsKilled=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xf)*(statCounters.viableCellsKilled)+((inst == 0xd)*(statCounters.viableCellsKilled+(access_neg)*(tmpptr->generation>2)))+((inst == 0xe)*(statCounters.viableCellsKilled+(access_pos)*(tmpptr->generation>2)));
+            statCounter.viableCellsKilled=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xf)*(statCounter.viableCellsKilled)+((inst == 0xd)*(statCounter.viableCellsKilled+(access_neg)*(tmpptr->generation>2)))+((inst == 0xe)*(statCounter.viableCellsKilled+(access_pos)*(tmpptr->generation>2)));
             tmpptr->genome[0]=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[0])+((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
             tmpptr->genome[1]=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[1])+((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
             tmpptr->ID=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->ID)+((inst == 0xd)*(tmpptr->ID * !(access_neg)+ (access_neg)*cellIdCounter));
@@ -381,7 +381,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
             tmpptr->generation = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->generation)+((inst == 0xd)*(tmpptr->generation * (access_neg)));
             tmpptr->energy=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xf)*(tmpptr->energy)+((inst == 0xe)*((access_pos * (tmp / 2) + (1 - access_pos) * tmpptr->energy)));
             /* Keep track of execution frequencies for each instruction */
-            statCounters.instructionExecutions[inst] += 1.0;
+            statCounter.instructionExecutions[inst] += 1.0;
         }
         wordPtr=(wordPtr*((shiftPtr+4<SYSWORD_BITS)||(wordPtr+1<POND_DEPTH_SYSWORDS)) + ((shiftPtr+4>=SYSWORD_BITS)&&(wordPtr+1<POND_DEPTH_SYSWORDS)) + EXEC_START_WORD*((wordPtr+1>=POND_DEPTH_SYSWORDS)&&(shiftPtr+4>=SYSWORD_BITS)))*!skip + wordPtr*skip;
         currentWord=(currentWord*(shiftPtr+4<SYSWORD_BITS)+(pptr->genome[wordPtr])*(shiftPtr+4>=SYSWORD_BITS))*!skip+ currentWord*skip;
@@ -400,7 +400,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
             if(rand) {
             /* Log it if we're replacing a viable cell */
             if (tmpptr->generation > 2)
-                ++statCounters.viableCellsReplaced;
+                ++statCounter.viableCellsReplaced;
             tmpptr->ID = ++cellIdCounter;
             tmpptr->parentID = pptr->ID;
             tmpptr->lineage = pptr->lineage; /* Lineage is copied in offspring */
