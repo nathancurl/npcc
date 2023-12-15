@@ -124,7 +124,7 @@ volatile struct {
 /* This is used to generate unique cell IDs */
 __managed__ static volatile uint64_t cellIdCounter = 0;
 
-__host__ __device__ static inline uintptr_t getRandomPre(int rollback, uintptr_t *ret, uint64_t *prngState)
+__host__ __device__ static inline void getRandomPre(int rollback, uintptr_t *ret, uint64_t *prngState)
 {
     // https://en.wikipedia.org/wiki/Xorshift#xorshift.2B
     uint64_t x = prngState[0];
@@ -165,7 +165,7 @@ __device__ static inline void accessAllowed(struct Cell *const c2, const uintptr
     *ret = ((((random >= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & sense) | (((random <= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & ~sense));
 }
 
-__device__ static inline struct Cell *getNeighbor(struct Cell *pond, const uintptr_t x, const uintptr_t y, const uintptr_t dir, struct Cell *ret)
+__device__ static inline void getNeighbor(struct Cell *pond, const uintptr_t x, const uintptr_t y, const uintptr_t dir, struct Cell *ret)
 {
     /* Define the changes in the x and y coordinates for each direction */
     int dx[] = {-1, 1, 0, 0}; // Changes in x for N_LEFT, N_RIGHT, N_UP, N_DOWN
