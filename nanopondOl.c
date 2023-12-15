@@ -458,6 +458,26 @@ static inline int accessAllowed(struct Cell *const c2, const uintptr_t c1guess, 
 	//return sense ? (((getRandomRollback(1) & 0xf) >= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)])||(!c2->parentID)) : (((getRandomRollback(1) & 0xf) <= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)])||(!c2->parentID));
 	return ((((random >= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & sense) | (((random <= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & ~sense));
 }
+/*
+static inline int accessAllowedSwitch(struct Cell *const c2, const uintptr_t c1guess, int sense)
+{
+    // Store the current 'in' index and last random number
+    int prev_in = in;
+    uintptr_t prev_last_random_number = last_random_number;
+
+    // Get a random number
+    uintptr_t random = (uintptr_t)(getRandom() & 0xf);
+
+    // Calculate the accessAllowed result
+    int result = ((((random >= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & sense) | (((random <= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & ~sense));
+
+    // Roll back the 'in' index and replace the last random number in the buffer
+    in = prev_in;
+    buffer[in] = prev_last_random_number;
+
+    return result;
+}
+*/
 
 volatile int exitNow = 0;
 
@@ -557,6 +577,8 @@ static void *run(void *targ)
         int skip=0;
 		int access_neg_used = 0;
 		int access_pos_used = 0;
+		int access_neg = 0;
+		int access_pos = 0;
 
 		/* We use a currentWord buffer to hold the word we're
 		 * currently working on.  This speeds things up a bit
@@ -591,15 +613,14 @@ static void *run(void *targ)
 			}
 			
 
-			/*
+			
 			uintptr_t mutation_occurred = (getRandomRollback(1) & 0xffffffff) < MUTATION_RATE;
-			uintptr_t new_tmp = getRandomRollback(mutation_occurred);
-			uintptr_t tmp = new_tmp * mutation_occurred + tmp * (!mutation_occurred);
+			uintptr_t tmp = getRandomRollback(mutation_occurred) * mutation_occurred;
 			uintptr_t is_inst = (tmp & 0x80) >> 7; // Shift right by 7 to get a 1 or 0
-			uintptr_t is_reg = !(is_inst); // Use negation to ensure is_reg is either 1 or 0
+			uintptr_t is_reg = ~is_inst & 0x1; // Invert is_inst and mask with 0x1 to get a 1 or 0
 			inst = (tmp & 0xf) * is_inst + inst * (!is_inst); // Update inst only if is_inst is 1
 			reg = (tmp & 0xf) * is_reg + reg * (!is_reg); // Update reg only if is_reg is 1
-			*/
+			
 
 			/* Each instruction processed costs one unit of energy */
 			--pptr->energy;
@@ -612,202 +633,41 @@ static void *run(void *targ)
 				else if (inst == 0xa) /* Decrement on REP */
 					--falseLoopDepth;
 			} else {
-				/*
-				* ptr_shiftPtr
-				*/
-				ptr_shiftPtr = 
-				(inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf) * (ptr_shiftPtr) +
-				((inst == 0x0)*0)+
-				((inst == 0x1)*((ptr_shiftPtr+4)*((ptr_shiftPtr+4)<SYSWORD_BITS)))+
-				((inst == 0x2)*(((ptr_shiftPtr==0)*SYSWORD_BITS)+ptr_shiftPtr-4));
-				/*
-				* ptr_wordPtr
-				* set in 0x0, 0x1, 0x2
-				*/				
-				ptr_wordPtr =
-				(inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf) * (ptr_wordPtr) +
-				((inst == 0x0)*0)+
-				((inst == 0x1)*(((ptr_wordPtr*(ptr_shiftPtr!=0||((ptr_wordPtr+1)<POND_DEPTH_SYSWORDS))+(ptr_shiftPtr==0)*((ptr_wordPtr+1)<POND_DEPTH_SYSWORDS)))))+
-				((inst == 0x2)*(((ptr_wordPtr==0&&ptr_shiftPtr==(SYSWORD_BITS-4))*(POND_DEPTH_SYSWORDS))+ptr_wordPtr-(ptr_shiftPtr==(SYSWORD_BITS-4))));
-				
-               /*
-                * wordPtr
-                * set in 0xc
-                */ 
-                wordPtr=
-				(inst==0x0||inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5|| inst == 0x6 || inst==0x7||inst==0x8||inst==0x9||inst==0xb||inst==0xd||inst==0xe||inst==0xf)*(wordPtr)+
-                ((inst==0xa)*(wordPtr*!(reg&&loopStackPtr)+(loopStack_wordPtr[loopStackPtr-1]*(reg&&loopStackPtr))))+
-                ((inst==0xc)*(wordPtr*((shiftPtr+4<SYSWORD_BITS)||(wordPtr+1<POND_DEPTH_SYSWORDS))+((shiftPtr+4>=SYSWORD_BITS)&&(wordPtr+1<POND_DEPTH_SYSWORDS))+EXEC_START_WORD*((wordPtr+1>=POND_DEPTH_SYSWORDS)&&(shiftPtr+4>=SYSWORD_BITS))));
 
-               /*
-                * shiftPtr
-                * set in 0xc
-                */ 
-                shiftPtr=
-				(inst==0x0||inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5|| inst == 0x6 || inst==0x7||inst==0x8||inst==0x9||inst==0xb||inst==0xd||inst==0xe||inst==0xf)*(shiftPtr)+
-                ((inst==0xa)*(shiftPtr*!(reg&&loopStackPtr)+(loopStack_shiftPtr[loopStackPtr-1]*(reg&&loopStackPtr))))+
-                ((inst==0xc)*((shiftPtr+4)+(shiftPtr+4>=SYSWORD_BITS)*(-shiftPtr-4)));
-
-
-                /*
-                 * skip from 0xc 
-                 */
+				ptr_shiftPtr = (inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf) * (ptr_shiftPtr) +((inst == 0x0)*0)+((inst == 0x1)*((ptr_shiftPtr+4)*((ptr_shiftPtr+4)<SYSWORD_BITS)))+((inst == 0x2)*(((ptr_shiftPtr==0)*SYSWORD_BITS)+ptr_shiftPtr-4)); 
+                ptr_wordPtr = (inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf) * (ptr_wordPtr) +((inst == 0x0)*0)+((inst == 0x1)*(((ptr_wordPtr*(ptr_shiftPtr!=0||((ptr_wordPtr+1)<POND_DEPTH_SYSWORDS))+(ptr_shiftPtr==0)*((ptr_wordPtr+1)<POND_DEPTH_SYSWORDS)))))+((inst == 0x2)*(((ptr_wordPtr==0&&ptr_shiftPtr==(SYSWORD_BITS-4))*(POND_DEPTH_SYSWORDS))+ptr_wordPtr-(ptr_shiftPtr==(SYSWORD_BITS-4))));
+				wordPtr=(inst==0x0||inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5|| inst == 0x6 || inst==0x7||inst==0x8||inst==0x9||inst==0xb||inst==0xd||inst==0xe||inst==0xf)*(wordPtr)+((inst==0xa)*(wordPtr*!(reg&&loopStackPtr)+(loopStack_wordPtr[loopStackPtr-1]*(reg&&loopStackPtr))))+((inst==0xc)*(wordPtr*((shiftPtr+4<SYSWORD_BITS)||(wordPtr+1<POND_DEPTH_SYSWORDS))+((shiftPtr+4>=SYSWORD_BITS)&&(wordPtr+1<POND_DEPTH_SYSWORDS))+EXEC_START_WORD*((wordPtr+1>=POND_DEPTH_SYSWORDS)&&(shiftPtr+4>=SYSWORD_BITS)))); 
+                shiftPtr=(inst==0x0||inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5|| inst == 0x6 || inst==0x7||inst==0x8||inst==0x9||inst==0xb||inst==0xd||inst==0xe||inst==0xf)*(shiftPtr)+((inst==0xa)*(shiftPtr*!(reg&&loopStackPtr)+(loopStack_shiftPtr[loopStackPtr-1]*(reg&&loopStackPtr))))+((inst==0xc)*((shiftPtr+4)+(shiftPtr+4>=SYSWORD_BITS)*(-shiftPtr-4)));
                 skip=(reg&&loopStackPtr)*(inst==0xa);
-                
-                
-				/*facing is called in 0x0 and 0xb
-				* facing is used to determine which direction the cell is facing
-				*/
-				facing=
-				(inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5||inst==0x6||inst==0x7||inst==0x8||inst==0x9||inst==0xa||inst==0xc||inst==0xd||inst==0xe||inst==0xf)*(facing) + 
-				((inst==0x0)*0)+
-				((inst==0xb)*(reg & 3));
-
-				/* pptr->genome[ptr_wordPtr]*/
-				pptr->genome[ptr_wordPtr]=
-				(inst==0x0||inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5||inst==0x7||inst==0x8||inst==0x9||inst==0xa||inst==0xb||inst==0xc||inst==0xd||inst==0xe||inst==0xf)
-				*(pptr->genome[ptr_wordPtr])+((inst==0x6)*((pptr->genome[ptr_wordPtr]&~(((uintptr_t)0xf)<<ptr_shiftPtr))|reg<<ptr_shiftPtr)); 
-				/*
-				* wordPtr
-				* set in 0xa
-				*/
-				/*
-				* outputBuf[ptr_wordPtr]
-				* set in 0x8
-				*/
-				outputBuf[ptr_wordPtr]=
-				(inst==0x0||inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5|| inst == 0x6 || inst==0x7||inst==0x9||inst==0xa||inst==0xb||inst==0xc||inst==0xd||inst==0xe||inst==0xf)*(outputBuf[ptr_wordPtr])+
-				((inst==0x8)*((outputBuf[ptr_wordPtr]&~(((uintptr_t)0xf) << ptr_shiftPtr))|reg << ptr_shiftPtr));
-				
-                
-                
-                /*
-				* currentWord
-				* set in 0x6, 0xa, 0xc
-				* TODO: 0xa, 0xc
-				*/
-				currentWord=
-				(inst==0x0||inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5||inst==0x7||inst==0x8||inst==0x9|| inst==0xb || inst==0xd||inst==0xe||inst==0xf)*(currentWord)+
-				((inst==0x6)*(pptr->genome[wordPtr]))+
-				((inst==0xa)*(currentWord*!(reg&&loopStackPtr)+(pptr->genome[wordPtr])*(reg&&loopStackPtr)))+
-				((inst == 0xc)*(pptr->genome[wordPtr]));
-				
-                /*
-				* stop
-				* set in 0x9 & 0xf
-				*/
-				stop=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe)*(stop)+
-				((inst == 0x9)*(stop*!(reg&&(loopStackPtr>=POND_DEPTH))+(reg&&(loopStackPtr>=POND_DEPTH))))+
-				((inst == 0xf)*(1));
-				/*
-				* loopStack_wordPtr[loopStackPtr]
-				* loopStack_wordPtr[loopStackPtr] set in 0x9
-				*/
-				loopStack_wordPtr[loopStackPtr]=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf)*(loopStack_wordPtr[loopStackPtr])+
-				((inst == 0x9)*(loopStack_wordPtr[loopStackPtr]*(!reg||(loopStackPtr>=POND_DEPTH))+(wordPtr*(reg&&(loopStackPtr<POND_DEPTH)))));
-				/*
-				* loopStack_shiftPtr[loopStackPtr]
-				* set in 0x9
-				*/
-				loopStack_shiftPtr[loopStackPtr]=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf)*(loopStack_shiftPtr[loopStackPtr])+
-				((inst == 0x9) * (loopStack_shiftPtr[loopStackPtr]*(!reg||(loopStackPtr>=POND_DEPTH))+(shiftPtr*(reg&&(loopStackPtr<POND_DEPTH)))));
-				/*
-				* loopStackPtr
-				* set in 0x9
-				*/
-				loopStackPtr=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf)*(loopStackPtr)+
-				((inst == 0x9)*(loopStackPtr + (reg&&(loopStackPtr<POND_DEPTH))))+
-                ((inst == 0xa)*(loopStackPtr-!!loopStackPtr));
-				/*
-				* falseLoopDepth
-				* set in 0x9,
-				*/
-				falseLoopDepth=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf)*(falseLoopDepth)+
-				((inst == 0x9)*(falseLoopDepth + (!reg)));
-				/*
-				* tmpptr
-				* set is 0xd, 0xe
-				*/
+				facing=(inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5||inst==0x6||inst==0x7||inst==0x8||inst==0x9||inst==0xa||inst==0xc||inst==0xd||inst==0xe||inst==0xf)*(facing) + ((inst==0x0)*0)+((inst==0xb)*(reg & 3));
+				pptr->genome[ptr_wordPtr]=(inst==0x0||inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5||inst==0x7||inst==0x8||inst==0x9||inst==0xa||inst==0xb||inst==0xc||inst==0xd||inst==0xe||inst==0xf)*(pptr->genome[ptr_wordPtr])+((inst==0x6)*((pptr->genome[ptr_wordPtr]&~(((uintptr_t)0xf)<<ptr_shiftPtr))|reg<<ptr_shiftPtr)); 
+				outputBuf[ptr_wordPtr]=(inst==0x0||inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5|| inst == 0x6 || inst==0x7||inst==0x9||inst==0xa||inst==0xb||inst==0xc||inst==0xd||inst==0xe||inst==0xf)*(outputBuf[ptr_wordPtr])+((inst==0x8)*((outputBuf[ptr_wordPtr]&~(((uintptr_t)0xf) << ptr_shiftPtr))|reg << ptr_shiftPtr));
+				currentWord=(inst==0x0||inst==0x1||inst==0x2||inst==0x3||inst==0x4||inst==0x5||inst==0x7||inst==0x8||inst==0x9|| inst==0xb || inst==0xd||inst==0xe||inst==0xf)*(currentWord)+((inst==0x6)*(pptr->genome[wordPtr]))+((inst==0xa)*(currentWord*!(reg&&loopStackPtr)+(pptr->genome[wordPtr])*(reg&&loopStackPtr)))+((inst == 0xc)*(pptr->genome[wordPtr]));
+				stop=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe)*(stop)+((inst == 0x9)*(stop*!(reg&&(loopStackPtr>=POND_DEPTH))+(reg&&(loopStackPtr>=POND_DEPTH))))+((inst == 0xf)*(1));
+				loopStack_wordPtr[loopStackPtr]=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf)*(loopStack_wordPtr[loopStackPtr])+((inst == 0x9)*(loopStack_wordPtr[loopStackPtr]*(!reg||(loopStackPtr>=POND_DEPTH))+(wordPtr*(reg&&(loopStackPtr<POND_DEPTH)))));
+				loopStack_shiftPtr[loopStackPtr]=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf)*(loopStack_shiftPtr[loopStackPtr])+((inst == 0x9) * (loopStack_shiftPtr[loopStackPtr]*(!reg||(loopStackPtr>=POND_DEPTH))+(shiftPtr*(reg&&(loopStackPtr<POND_DEPTH)))));
+				loopStackPtr=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf)*(loopStackPtr)+((inst == 0x9)*(loopStackPtr + (reg&&(loopStackPtr<POND_DEPTH))))+((inst == 0xa)*(loopStackPtr-!!loopStackPtr));
+				falseLoopDepth=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xe || inst == 0xf)*(falseLoopDepth)+((inst == 0x9)*(falseLoopDepth + (!reg)));
 				tmpptr = getNeighbor(x,y,facing);
 				access_neg_used = 0;
 				access_pos_used = 0;
-				
-				access_pos_used =
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xf)*(access_pos_used)+
-				((inst == 0xe)*(1));
-
-				access_neg_used =
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe|| inst == 0xf)*(access_neg_used)+
-				((inst == 0xd)*(1));
-				
-				int access_neg = accessAllowed(tmpptr,reg,0, access_neg_used);
-				int access_pos = accessAllowed(tmpptr,reg,1, access_pos_used);
-
-				statCounters.viableCellsKilled=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xf)*(statCounters.viableCellsKilled)+
-				((inst == 0xd)*(statCounters.viableCellsKilled+(access_neg)*(tmpptr->generation>2)))+
-				((inst == 0xe)*(statCounters.viableCellsKilled+(access_pos)*(tmpptr->generation>2)));
-
-				tmpptr->genome[0]=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[0])+
-				((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
-
-				tmpptr->genome[1]=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[1])+
-				((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
-
-				tmpptr->ID=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->ID)+
-				((inst == 0xd)*(tmpptr->ID * !(access_neg)+ (access_neg)*cellIdCounter));
-
-				tmpptr->parentID=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->parentID)+
-				((inst == 0xd)*(tmpptr->parentID * !(access_neg)));
-
-				tmpptr->lineage=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->lineage)+
-				((inst == 0xd)*(tmpptr->lineage * !(access_neg) + (access_neg)*cellIdCounter));
-
-				cellIdCounter=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(cellIdCounter)+
-				((inst == 0xd)*(cellIdCounter * !(access_neg) + (access_neg)* cellIdCounter));
-
-				tmp =
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xf)*(tmp)+
-				((inst == 0xc)*(reg))+
-				((inst == 0xd)*((access_neg) + (tmpptr->generation>2)*!(access_neg)*(pptr->energy / FAILED_KILL_PENALTY)))+
-				((inst == 0xe)* (pptr->energy + tmpptr->energy));
-
-				reg=
-				(inst == 0x1 || inst == 0x2 || inst == 0x6 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xd ||inst == 0xe || inst == 0xf) * (reg) + 
-				((inst==0x0)*0) + 
-				((inst==0x3)*((reg + 1) & 0xf)) +
-				((inst==0x4)*((reg - 1) & 0xf)) +
-				((inst==0x5)*((pptr->genome[ptr_wordPtr] >> ptr_shiftPtr) & 0xf)) +
-				((inst==0x7)*((outputBuf[ptr_wordPtr] >> ptr_shiftPtr) & 0xf)) +
-				((inst==0xc)*((pptr->genome[wordPtr] >> shiftPtr) & 0xf));
-
-				pptr->genome[wordPtr]=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xd || inst == 0xe || inst == 0xf)*(pptr->genome[wordPtr])+
-				((inst == 0xc)* (((pptr->genome[wordPtr]&~(((uintptr_t)0xf) << shiftPtr))|tmp << shiftPtr)));
-
-				pptr->energy=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xf)*(pptr->energy)+
-				((inst == 0xd)*(pptr->energy+!(access_neg)*(tmpptr->generation>2)*(-pptr->energy) + !(access_neg)*(tmpptr->generation>2)*(pptr->energy-tmp)))+
-				((inst == 0xe)*((access_pos * (tmp - (access_pos * (tmp / 2) + (1 - access_pos) * tmpptr->energy)) + (1 - access_pos) * pptr->energy)));
-
-				tmpptr->generation=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->generation)+
-				((inst == 0xd)*(tmpptr->generation * (access_neg)));
-
-				tmpptr->energy=
-				(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xf)*(tmpptr->energy)+
-				((inst == 0xe)*((access_pos * (tmp / 2) + (1 - access_pos) * tmpptr->energy)));
+				access_pos_used = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xf)*(access_pos_used)+((inst == 0xe)*(1));
+				access_neg_used = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe|| inst == 0xf)*(access_neg_used)+((inst == 0xd)*(1));
+				access_neg = accessAllowed(tmpptr,reg,0, access_neg_used);
+				access_pos = accessAllowed(tmpptr,reg,1, access_pos_used);
+				statCounters.viableCellsKilled=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xf)*(statCounters.viableCellsKilled)+((inst == 0xd)*(statCounters.viableCellsKilled+(access_neg)*(tmpptr->generation>2)))+((inst == 0xe)*(statCounters.viableCellsKilled+(access_pos)*(tmpptr->generation>2)));
+				tmpptr->genome[0]=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[0])+((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
+				tmpptr->genome[1]=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[1])+((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
+				tmpptr->ID=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->ID)+((inst == 0xd)*(tmpptr->ID * !(access_neg)+ (access_neg)*cellIdCounter));
+				tmpptr->parentID=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->parentID)+((inst == 0xd)*(tmpptr->parentID * !(access_neg)));
+				tmpptr->lineage=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->lineage)+((inst == 0xd)*(tmpptr->lineage * !(access_neg) + (access_neg)*cellIdCounter));
+				cellIdCounter=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(cellIdCounter)+((inst == 0xd)*(cellIdCounter * !(access_neg) + (access_neg)* cellIdCounter));
+				tmp = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xf)*(tmp)+((inst == 0xc)*(reg))+((inst == 0xd)*((access_neg) + (tmpptr->generation>2)*!(access_neg)*(pptr->energy / FAILED_KILL_PENALTY)))+((inst == 0xe)* (pptr->energy + tmpptr->energy));
+				reg = (inst == 0x1 || inst == 0x2 || inst == 0x6 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xd ||inst == 0xe || inst == 0xf) * (reg) + ((inst==0x0)*0) + ((inst==0x3)*((reg + 1) & 0xf)) +((inst==0x4)*((reg - 1) & 0xf)) +((inst==0x5)*((pptr->genome[ptr_wordPtr] >> ptr_shiftPtr) & 0xf)) +((inst==0x7)*((outputBuf[ptr_wordPtr] >> ptr_shiftPtr) & 0xf)) +((inst==0xc)*((pptr->genome[wordPtr] >> shiftPtr) & 0xf));
+				pptr->genome[wordPtr]= (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xd || inst == 0xe || inst == 0xf)*(pptr->genome[wordPtr])+((inst == 0xc)* (((pptr->genome[wordPtr]&~(((uintptr_t)0xf) << shiftPtr))|tmp << shiftPtr)));
+				pptr->energy = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xf)*(pptr->energy)+((inst == 0xd)*(pptr->energy+!(access_neg)*(tmpptr->generation>2)*(-pptr->energy) + !(access_neg)*(tmpptr->generation>2)*(pptr->energy-tmp)))+((inst == 0xe)*((access_pos * (tmp - (access_pos * (tmp / 2) + (1 - access_pos) * tmpptr->energy)) + (1 - access_pos) * pptr->energy)));
+				tmpptr->generation = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->generation)+((inst == 0xd)*(tmpptr->generation * (access_neg)));
+				tmpptr->energy=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xf)*(tmpptr->energy)+((inst == 0xe)*((access_pos * (tmp / 2) + (1 - access_pos) * tmpptr->energy)));
 				
 				/* Keep track of execution frequencies for each instruction */
 				statCounters.instructionExecutions[inst] += 1.0;
@@ -826,14 +686,32 @@ static void *run(void *targ)
                 +
                 EXEC_START_WORD*((wordPtr+1>=POND_DEPTH_SYSWORDS)&&(shiftPtr+4>=SYSWORD_BITS)))*!skip + wordPtr*skip;
 
+            //currentWord gets incremented when the shiftptr is greater than
+            //SYSWORD_BITS, and it's time to move to the next word
             currentWord=(currentWord*(shiftPtr+4<SYSWORD_BITS)
                 +
                 (pptr->genome[wordPtr])*(shiftPtr+4>=SYSWORD_BITS))*!skip
                 + currentWord*skip;
             
+            //shiftPtr shifts the current nibble being read by the machine
+            //It incrememnts four bits until it gets past SYSWORD_BITS, the 
+            //number of bits in a word, and then resets at either 0 or
+            //EXEC_START_BIT
             shiftPtr=((shiftPtr+4)
                     +
                     (shiftPtr+4>=SYSWORD_BITS)*(-shiftPtr-4))*!skip+shiftPtr*skip;
+            //+
+                //(EXEC_START_BIT)*(wordPtr+1>=POND_DEPTH_SYSWORDS)
+                //*(shiftPtr+4>=SYSWORD_BITS);
+            /*
+            if ((shiftPtr += 4) >= SYSWORD_BITS) {
+				if (++wordPtr >= POND_DEPTH_SYSWORDS) {
+					wordPtr = EXEC_START_WORD;
+					shiftPtr = EXEC_START_BIT;
+				} else shiftPtr = 0;
+				currentWord = pptr->genome[wordPtr];
+			}
+            */
         }   
 
 		/* Copy outputBuf into neighbor if access is permitted and there
@@ -860,6 +738,7 @@ static void *run(void *targ)
 			}
 		}
 	}
+
 	return (void *)0;
 }
 

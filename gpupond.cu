@@ -264,15 +264,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <cuda.h>
 
 #define BUFFER_SIZE 1000  // Size of the circular buffer
-static uintptr_t buffer[BUFFER_SIZE];
+__managed__ uintptr_t buffer[BUFFER_SIZE];
 static int in = 0;
 static uintptr_t last_random_number;
 
-volatile uint64_t prngState[2];
+__managed__ volatile uint64_t prngState[2];
 
-static inline uintptr_t getRandomPre(int rollback)
+__device__ void getRandomPre(int rollback, uintptr_t &ret)
 {
 	// https://en.wikipedia.org/wiki/Xorshift#xorshift.2B
 	uint64_t x = prngState[0];
@@ -281,20 +282,20 @@ static inline uintptr_t getRandomPre(int rollback)
 	x ^= x << 23;
 	const uint64_t z = x ^ y ^ (x >> 17) ^ (y >> 26);
 	prngState[1] = prngState[1] * !rollback + rollback * z;
-	return (uintptr_t)(z + y);
+	ret = (uintptr_t)(z + y);
 }
-void precalculate_random_numbers() {
+__global__ void precalculate_random_numbers() {
     for (int i = 0; i < BUFFER_SIZE; i++) {
         buffer[i] = getRandomPre(1);
     }
 }
-static inline uintptr_t getRandomRollback(uintptr_t rollback) {
+__device__ uintptr_t getRandomRollback(uintptr_t rollback, int &ret) {
     uintptr_t num = buffer[in];
     last_random_number = num;  // Store the last random number
     uintptr_t new_num = getRandomPre(rollback);
     buffer[in] = (new_num & -rollback) | (num & ~-rollback);
     in = (((in + 1) & -rollback) | (in & ~-rollback)) % BUFFER_SIZE;
-    return num;
+    ret = num;
 }
 /* Pond depth in machine-size words.  This is calculated from
  * POND_DEPTH and the size of the machine word. (The multiplication
@@ -581,22 +582,18 @@ static void *run(void *targ)
 			 * it can have all manner of different effects on the end result of
 			 * replication: insertions, deletions, duplications of entire
 			 * ranges of the genome, etc. */
-
-			
+			 
 			if ((getRandomRollback(1) & 0xffffffff) < MUTATION_RATE) {
 				tmp = getRandomRollback(1); // Call getRandom() only once for speed 
 				if (tmp & 0x80) // Check for the 8th bit to get random boolean 
 					inst = tmp & 0xf; // Only the first four bits are used here 
 				else reg = tmp & 0xf;
 			}
-			
-
 			/*
 			uintptr_t mutation_occurred = (getRandomRollback(1) & 0xffffffff) < MUTATION_RATE;
-			uintptr_t new_tmp = getRandomRollback(mutation_occurred);
-			uintptr_t tmp = new_tmp * mutation_occurred + tmp * (!mutation_occurred);
+			uintptr_t tmp = getRandomRollback(mutation_occurred) * mutation_occurred;
 			uintptr_t is_inst = (tmp & 0x80) >> 7; // Shift right by 7 to get a 1 or 0
-			uintptr_t is_reg = !(is_inst); // Use negation to ensure is_reg is either 1 or 0
+			uintptr_t is_reg = ~is_inst & 0x1; // Invert is_inst and mask with 0x1 to get a 1 or 0
 			inst = (tmp & 0xf) * is_inst + inst * (!is_inst); // Update inst only if is_inst is 1
 			reg = (tmp & 0xf) * is_reg + reg * (!is_reg); // Update reg only if is_reg is 1
 			*/
@@ -789,7 +786,7 @@ static void *run(void *targ)
 				((inst==0x3)*((reg + 1) & 0xf)) +
 				((inst==0x4)*((reg - 1) & 0xf)) +
 				((inst==0x5)*((pptr->genome[ptr_wordPtr] >> ptr_shiftPtr) & 0xf)) +
-				((inst==0x7)*((outputBuf[ptr_wordPtr] >> ptr_shiftPtr) & 0xf)) +
+				((inst==0x7)*((outputBuf[ptr_wordPtr] >> ptr_shiftPtr) & 0xf))+
 				((inst==0xc)*((pptr->genome[wordPtr] >> shiftPtr) & 0xf));
 
 				pptr->genome[wordPtr]=
@@ -811,6 +808,7 @@ static void *run(void *targ)
 				
 				/* Keep track of execution frequencies for each instruction */
 				statCounters.instructionExecutions[inst] += 1.0;
+
 			}
 			
 			/* Advance the shift and word pointers, and loop around
@@ -826,14 +824,32 @@ static void *run(void *targ)
                 +
                 EXEC_START_WORD*((wordPtr+1>=POND_DEPTH_SYSWORDS)&&(shiftPtr+4>=SYSWORD_BITS)))*!skip + wordPtr*skip;
 
+            //currentWord gets incremented when the shiftptr is greater than
+            //SYSWORD_BITS, and it's time to move to the next word
             currentWord=(currentWord*(shiftPtr+4<SYSWORD_BITS)
                 +
                 (pptr->genome[wordPtr])*(shiftPtr+4>=SYSWORD_BITS))*!skip
                 + currentWord*skip;
             
+            //shiftPtr shifts the current nibble being read by the machine
+            //It incrememnts four bits until it gets past SYSWORD_BITS, the 
+            //number of bits in a word, and then resets at either 0 or
+            //EXEC_START_BIT
             shiftPtr=((shiftPtr+4)
                     +
                     (shiftPtr+4>=SYSWORD_BITS)*(-shiftPtr-4))*!skip+shiftPtr*skip;
+            //+
+                //(EXEC_START_BIT)*(wordPtr+1>=POND_DEPTH_SYSWORDS)
+                //*(shiftPtr+4>=SYSWORD_BITS);
+            /*
+            if ((shiftPtr += 4) >= SYSWORD_BITS) {
+				if (++wordPtr >= POND_DEPTH_SYSWORDS) {
+					wordPtr = EXEC_START_WORD;
+					shiftPtr = EXEC_START_BIT;
+				} else shiftPtr = 0;
+				currentWord = pptr->genome[wordPtr];
+			}
+            */
         }   
 
 		/* Copy outputBuf into neighbor if access is permitted and there
@@ -860,6 +876,7 @@ static void *run(void *targ)
 			}
 		}
 	}
+
 	return (void *)0;
 }
 
