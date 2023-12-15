@@ -241,7 +241,7 @@ static void doReport(struct Cell *pond, const uint64_t clock)
 		((uint8_t *)&statCounters)[x] = (uint8_t)0;
 }
 
-__global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState) 
+__global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState, decltype(statCounters) *statCounters) 
 {
     //const uintptr_t threadNo = (uintptr_t)targ;
     uintptr_t x,y,i;
@@ -449,7 +449,10 @@ int main() {
     cudaMemcpy(d_prngState, h_prngState, 2 * sizeof(uint64_t), cudaMemcpyHostToDevice);
 
     // Reset per-report stat counters
-    // This can be done in a kernel if statCounters is on the GPU
+    // Declare a device pointer for statCounters
+    decltype(statCounters) *d_statCounters;
+    cudaMalloc(&d_statCounters, sizeof(statCounters));
+
 
     // Clear the pond and initialize all genomes
     // This can be done in a kernel
@@ -458,8 +461,9 @@ int main() {
    // Call the kernel function
     for (uint64_t n = 0; n < 1000000; n++){
         for (int m = 0 ; m < REPORT_FREQUENCY; m++){
-            run<<<1, 1>>>(d_pond, d_buffer, d_in, d_prngState);
+            run<<<1, 1>>>(d_pond, d_buffer, d_in, d_prngState, d_statCounters);
         }
+        cudaMemcpy(&statCounters, d_statCounters, sizeof(statCounters), cudaMemcpyDeviceToHost);
         cudaMemcpy(h_pond, d_pond, POND_SIZE_X * POND_SIZE_Y * sizeof(struct Cell), cudaMemcpyDeviceToHost);
         doReport(h_pond, n);
     }
@@ -471,6 +475,7 @@ int main() {
     cudaFree(d_last_random_number);
     cudaFree(d_prngState);
     cudaFree(d_pond);
+    cudaFree(d_statCounters);
 
     return 0;
 }
