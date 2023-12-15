@@ -139,15 +139,15 @@ __host__ __device__ static inline uintptr_t getRandomPre(int rollback, uintptr_t
 void precalculate_random_numbers(uintptr_t *buffer, uint64_t *prngState) {
     for (int i = 0; i < BUFFER_SIZE; i++) {
         uintptr_t val;
-        getRandomPre(1, &val, &prngState);
+        getRandomPre(1, &val, prngState);
         buffer[i] = val;
     }
 }
 
-__device__ static inline uintptr_t getRandomRollback(uintptr_t rollback, uintptr_t *ret, uintptr_t *buffer, int *in, uint64_t *prngState) {
+__device__ static inline void getRandomRollback(uintptr_t rollback, uintptr_t *ret, uintptr_t *buffer, int *in, uint64_t *prngState) {
     uintptr_t num = buffer[*in];
     uintptr_t new_num;
-    getRandomPre(rollback, &new_num, &prngState);
+    getRandomPre(rollback, &new_num, prngState);
     buffer[*in] = (new_num & -rollback) | (num & ~-rollback);
     *in = (((*in + 1) & -rollback) | (*in & ~-rollback)) % BUFFER_SIZE;
     *ret = num;
@@ -157,7 +157,7 @@ __device__ static inline void accessAllowed(struct Cell *const c2, const uintptr
 {
     uintptr_t BITS_IN_FOURBIT_WORD[16] = { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4 };
     uintptr_t random = 0; 
-    getRandomRollback(rollback, &random, &buffer, &in, &prngState);
+    getRandomRollback(rollback, &random, buffer, in, prngState);
     random = (uintptr_t)(random & 0xf);
     /* Access permission is more probable if they are more similar in sense 0,
      * and more probable if they are different in sense 1. Sense 0 is used for
@@ -165,7 +165,7 @@ __device__ static inline void accessAllowed(struct Cell *const c2, const uintptr
     *ret = ((((random >= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & sense) | (((random <= BITS_IN_FOURBIT_WORD[(c2->genome[0] & 0xf) ^ (c1guess & 0xf)]) || !c2->parentID) & ~sense));
 }
 
-__device__ static inline struct Cell *getNeighbor(struct Cell *pond, const uintptr_t x, const uintptr_t y, const uintptr_t dir, uintptr_t *ret)
+__device__ static inline struct Cell *getNeighbor(struct Cell *pond, const uintptr_t x, const uintptr_t y, const uintptr_t dir, struct Cell *ret)
 {
     /* Define the changes in the x and y coordinates for each direction */
     int dx[] = {-1, 1, 0, 0}; // Changes in x for N_LEFT, N_RIGHT, N_UP, N_DOWN
