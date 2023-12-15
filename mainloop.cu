@@ -103,7 +103,7 @@ struct Cell
 	uintptr_t genome[POND_DEPTH_SYSWORDS];
 };
 
-volatile struct {
+struct statCounters {
 	/* Counts for the number of times each instruction was
 	 * executed since the last report. */
 	double instructionExecutions[16];
@@ -119,7 +119,7 @@ volatile struct {
 	
 	/* Number of successful SHARE operations */
 	uintptr_t viableCellShares;
-} statCounters;
+};
 
 /* This is used to generate unique cell IDs */
 __managed__ static volatile uint64_t cellIdCounter = 0;
@@ -241,7 +241,7 @@ static void doReport(struct Cell *pond, const uint64_t clock)
 		((uint8_t *)&statCounters)[x] = (uint8_t)0;
 }
 
-__global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState, decltype(statCounters) *statCounters) 
+__global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState, struct *statCounters) 
 {
     //const uintptr_t threadNo = (uintptr_t)targ;
     uintptr_t x,y,i;
@@ -450,8 +450,9 @@ int main() {
 
     // Reset per-report stat counters
     // Declare a device pointer for statCounters
-    decltype(statCounters) *d_statCounters;
-    cudaMalloc(&d_statCounters, sizeof(statCounters));
+    struct statCounters *d_statCounters;
+    struct statCounters statCounters;
+    cudaMalloc(&d_statCounters, sizeof(d_statCounters));
 
 
     // Clear the pond and initialize all genomes
