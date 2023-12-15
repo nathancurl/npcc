@@ -456,7 +456,8 @@ int main() {
    // Call the kernel function
     for (int n = 0; n < 1000000; n++){
         for (int m = 0 ; m < REPORT_FREQUENCY; m++){
-            run<<<1, 1>>>(d_buffer, d_in, d_last_random_number, d_prngState, d_pond);
+            struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState
+            run<<<1, 1>>>(d_pond, d_buffer, d_in, d_prngState);
         }
         doReport(n);
     }
