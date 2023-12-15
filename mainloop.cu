@@ -450,16 +450,18 @@ int main() {
     struct Cell *d_pond;
     cudaMalloc(&d_pond, POND_SIZE_X * POND_SIZE_Y * sizeof(struct Cell));
     // ON CPU
-    struct Cell *h_pond;
     
     // Seed and init the random number generator
     uint64_t h_prngState[2] = {0, (uint64_t)rand()};
     cudaMemcpy(d_prngState, h_prngState, 2 * sizeof(uint64_t), cudaMemcpyHostToDevice);
 
+
+    struct statCounters *statCounters = (struct statCounters *)malloc(sizeof(struct statCounters));
+    struct Cell *h_pond = (struct Cell *)malloc(POND_SIZE_X * POND_SIZE_Y * sizeof(struct Cell));
     // Reset per-report stat counters
     // Declare a device pointer for statCounters
     struct statCounters *d_statCounters;
-    struct statCounters *statCounters;
+ 
     cudaMalloc(&d_statCounters, sizeof(d_statCounters));
 
 
@@ -474,7 +476,7 @@ int main() {
             cudaDeviceSynchronize();
             
         }
-        cudaMemcpy(statCounters, d_statCounters, sizeof(statCounters), cudaMemcpyDeviceToHost);
+        cudaMemcpy(statCounters, d_statCounters, sizeof(struct statCounters), cudaMemcpyDeviceToHost);  
         cudaMemcpy(h_pond, d_pond, POND_SIZE_X * POND_SIZE_Y * sizeof(struct Cell), cudaMemcpyDeviceToHost);
         doReport(h_pond, statCounters, n);
     }
@@ -487,6 +489,8 @@ int main() {
     cudaFree(d_prngState);
     cudaFree(d_pond);
     cudaFree(d_statCounters);
+    free(statCounters);
+    free(h_pond);
 
     return 0;
 }
