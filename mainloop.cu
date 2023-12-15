@@ -237,8 +237,8 @@ static void doReport(struct Cell *pond, struct statCounters *statCounter, const 
 	lastTotalViableReplicators = totalViableReplicators;
 	
 	/* Reset per-report stat counters */
-	for(x=0;x<sizeof(statCounters);++x)
-		((uint8_t *)&statCounters)[x] = (uint8_t)0;
+	for(x=0;x<sizeof(statCounter);++x)
+		((uint8_t *)&statCounter)[x] = (uint8_t)0;
 }
 
 __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState, struct statCounters *statCounter) 
