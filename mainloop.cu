@@ -178,7 +178,7 @@ __device__ static inline void getNeighbor(struct Cell *pond, const uintptr_t x, 
     ret = &pond[newY * POND_SIZE_X + newX];
 }
 
-static void doReport(struct Cell *pond, struct *statCounters, const uint64_t clock)
+static void doReport(struct Cell *pond, struct statCounters *statCounters, const uint64_t clock)
 {
     static uint64_t lastTotalViableReplicators = 0;
     
