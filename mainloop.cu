@@ -243,7 +243,7 @@ static void doReport(struct Cell *pond, const uint64_t clock)
 
 __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64_t *prngState) 
 {
-    const uintptr_t threadNo = (uintptr_t)targ;
+    //const uintptr_t threadNo = (uintptr_t)targ;
     uintptr_t x,y,i;
     uintptr_t clock = 0;
     uintptr_t outputBuf[POND_DEPTH_SYSWORDS];
@@ -258,10 +258,15 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
     uintptr_t loopStackPtr;
     uintptr_t falseLoopDepth;
     int stop;
+    int skip;
+    int access_neg_used;
+    int access_pos_used;
+    uintptr_t access_neg;
+    uintptr_t access_pos;
     if (!(clock % INFLOW_FREQUENCY)) {
-        getRandomRollback(1, &x, &buffer, &in, &prngState);
+        getRandomRollback(1, &x, buffer, in, prngState);
         x = x % POND_SIZE_X;
-        getRandomRollback(1, &y, &buffer, &in, &prngState);
+        getRandomRollback(1, &y, buffer, in, prngState);
         y = y % POND_SIZE_Y;
         pptr = &pond[y * POND_SIZE_X + x];
         pptr->ID = cellIdCounter;
@@ -270,21 +275,21 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
         pptr->generation = 0;
 #ifdef INFLOW_RATE_VARIATION
         int rand = 0;
-        getRandomRollback(1, &rand, &buffer, &in, &prngState);
+        getRandomRollback(1, &rand, buffer, in, prngState);
         pptr->energy += INFLOW_RATE_BASE + (rand % INFLOW_RATE_VARIATION);
 #else
         pptr->energy += INFLOW_RATE_BASE;
 #endif /* INFLOW_RATE_VARIATION */
         for(i=0;i<POND_DEPTH_SYSWORDS;++i) 
-            getRandomRollback(1, &rand, &buffer, &in, &prngState);
+            getRandomRollback(1, &rand, buffer, in, prngState);
             pptr->genome[i] = rand;
         ++cellIdCounter;
     }
     /* Pick a random cell to execute */
-    getRandomRollback(1,&rand, &buffer, &in, &prngState);
-    i = rand;
-    x = i % POND_SIZE_X;
-    y = ((i / POND_SIZE_X) >> 1) % POND_SIZE_Y;
+    getRandomRollback(1,&rand, buffer, in, prngState);
+    //
+    x = rand % POND_SIZE_X;
+    y = ((rand / POND_SIZE_X) >> 1) % POND_SIZE_Y;
     pptr = &pond[y * POND_SIZE_X + x];
     /* Reset the state of the VM prior to execution */
     for(i=0;i<POND_DEPTH_SYSWORDS;++i)
@@ -323,9 +328,9 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
             * it can have all manner of different effects on the end result of
             * replication: insertions, deletions, duplications of entire
             * ranges of the genome, etc. */
-        rand = getRandomRollback(1, &rand, &buffer, &in, &prngState);
+        getRandomRollback(1, &rand, buffer, in, prngState);
         if ((rand & 0xffffffff) < MUTATION_RATE) {
-            getRandomRollback(1, &rand, &buffer, &in, &prngState)
+            getRandomRollback(1, &rand, buffer, in, prngState)
             tmp = rand; // Call getRandom() only once for speed 
             if (tmp & 0x80) // Check for the 8th bit to get random boolean 
                 inst = tmp & 0xf; // Only the first four bits are used here 
@@ -360,8 +365,8 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
             access_pos_used = 0;
             access_pos_used = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xd || inst == 0xf)*(access_pos_used)+((inst == 0xe)*(1));
             access_neg_used = (inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe|| inst == 0xf)*(access_neg_used)+((inst == 0xd)*(1));
-            accessAllowed(tmpptr,reg,0, access_neg_used, &access_neg, &buffer, &in, &prngState);
-            accessAllowed(tmpptr,reg,1, access_pos_used, &access_pos, &buffer, &in, &prngState);
+            accessAllowed(tmpptr,reg,0, access_neg_used, &access_neg, buffer, in, prngState);
+            accessAllowed(tmpptr,reg,1, access_pos_used, &access_pos, buffer, in, prngState);
             statCounters.viableCellsKilled=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xf)*(statCounters.viableCellsKilled)+((inst == 0xd)*(statCounters.viableCellsKilled+(access_neg)*(tmpptr->generation>2)))+((inst == 0xe)*(statCounters.viableCellsKilled+(access_pos)*(tmpptr->generation>2)));
             tmpptr->genome[0]=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[0])+((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
             tmpptr->genome[1]=(inst == 0x0 || inst == 0x1 || inst == 0x2 || inst == 0x3 || inst == 0x4 || inst == 0x5 || inst == 0x6 || inst == 0x7 || inst == 0x8 || inst == 0x9 || inst == 0xa || inst == 0xb || inst == 0xc || inst == 0xe || inst == 0xf)*(tmpptr->genome[1])+((inst == 0xd)*(tmpptr->genome[0]*!(access_neg)+(access_neg)*~((uintptr_t)0)));
@@ -391,7 +396,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
         getNeighbor(pond,x,y,facing, tmpptr);
         //printf("%lu\n", tmpptr->energy);
         if ((tmpptr->energy)) {
-            accessAllowed(tmpptr,reg,0,1, &rand, &buffer, &in, &prngState);
+            accessAllowed(tmpptr,reg,0,1, &rand, buffer, in, prngState);
             if(rand) {
             /* Log it if we're replacing a viable cell */
             if (tmpptr->generation > 2)
