@@ -472,9 +472,9 @@ int main() {
         for (int m = 0 ; m < REPORT_FREQUENCY; m++){
             run<<<1, 1>>>(d_pond, d_buffer, d_in, d_prngState, d_statCounters);
             cudaDeviceSynchronize();
-            printf("haha");
+            
         }
-        cudaMemcpy(&statCounters, d_statCounters, sizeof(statCounters), cudaMemcpyDeviceToHost);
+        cudaMemcpy(statCounters, d_statCounters, sizeof(statCounters), cudaMemcpyDeviceToHost);
         cudaMemcpy(h_pond, d_pond, POND_SIZE_X * POND_SIZE_Y * sizeof(struct Cell), cudaMemcpyDeviceToHost);
         doReport(h_pond, statCounters, n);
     }
