@@ -77,6 +77,7 @@
 #include <cuda.h>
 
 
+
 /**
  * Structure for a cell in the pond
  */
@@ -180,6 +181,7 @@ __device__ static inline void getNeighbor(struct Cell *pond, const uintptr_t x, 
 
 static void doReport(struct Cell *pond, struct statCounters *statCounter, const uint64_t clock)
 {
+		atomicAdd_clock(clock, 1);
     static uint64_t lastTotalViableReplicators = 0;
     
     uintptr_t x,y;
