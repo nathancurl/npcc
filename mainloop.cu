@@ -442,7 +442,7 @@ int main() {
     struct Cell *d_pond;
     cudaMalloc(&d_pond, POND_SIZE_X * POND_SIZE_Y * sizeof(struct Cell));
     // ON CPU
-    struct Cell h_pond;
+    struct Cell *h_pond;
     
     // Seed and init the random number generator
     uint64_t h_prngState[2] = {0, (uint64_t)rand()};
