@@ -264,6 +264,13 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
     uintptr_t access_neg;
     uintptr_t access_pos;
     uintptr_t rand;
+    
+    while (!exitNow) {
+    clock++;
+    if (clock == 1000000)
+        {
+            exitNow = 1;
+        }
     if (!(clock % INFLOW_FREQUENCY)) {
         getRandomRollback(1, &x, buffer, in, prngState);
         x = x % POND_SIZE_X;
@@ -409,6 +416,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
                 tmpptr->genome[i] = outputBuf[i];
             }
         }
+    }
     }
 }
 
