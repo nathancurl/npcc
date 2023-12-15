@@ -274,7 +274,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
         pptr->lineage = cellIdCounter;
         pptr->generation = 0;
 #ifdef INFLOW_RATE_VARIATION
-        int rand = 0;
+        uintptr_t rand;
         getRandomRollback(1, &rand, buffer, in, prngState);
         pptr->energy += INFLOW_RATE_BASE + (rand % INFLOW_RATE_VARIATION);
 #else
@@ -330,7 +330,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
             * ranges of the genome, etc. */
         getRandomRollback(1, &rand, buffer, in, prngState);
         if ((rand & 0xffffffff) < MUTATION_RATE) {
-            getRandomRollback(1, &rand, buffer, in, prngState)
+            getRandomRollback(1, &rand, buffer, in, prngState);
             tmp = rand; // Call getRandom() only once for speed 
             if (tmp & 0x80) // Check for the 8th bit to get random boolean 
                 inst = tmp & 0xf; // Only the first four bits are used here 
