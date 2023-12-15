@@ -178,7 +178,7 @@ __device__ static inline void getNeighbor(struct Cell *pond, const uintptr_t x, 
     ret = &pond[newY * POND_SIZE_X + newX];
 }
 
-static void doReport(struct Cell *pond, struct statCounters statCounter, const uint64_t clock)
+static void doReport(struct Cell *pond, struct statCounters *statCounter, const uint64_t clock)
 {
     static uint64_t lastTotalViableReplicators = 0;
     
@@ -212,21 +212,21 @@ static void doReport(struct Cell *pond, struct statCounters statCounter, const u
 		(uint64_t)totalActiveCells,
 		(uint64_t)totalViableReplicators,
 		(uint64_t)maxGeneration,
-		(uint64_t)statCounter.viableCellsReplaced,
-		(uint64_t)statCounter.viableCellsKilled,
-		(uint64_t)statCounter.viableCellShares
+		(uint64_t)statCounter->viableCellsReplaced,
+		(uint64_t)statCounter->viableCellsKilled,
+		(uint64_t)statCounter->viableCellShares
 		);
 	
 	/* The next 16 are the average frequencies of execution for each
 	 * instruction per cell execution. */
 	double totalMetabolism = 0.0;
 	for(x=0;x<16;++x) {
-		totalMetabolism += statCounter.instructionExecutions[x];
-		printf(",%.4f",(statCounter.cellExecutions > 0.0) ? (statCounter.instructionExecutions[x] / statCounter.cellExecutions) : 0.0);
+		totalMetabolism += statCounter->instructionExecutions[x];
+		printf(",%.4f",(statCounter->cellExecutions > 0.0) ? (statCounter->instructionExecutions[x] / statCounter->cellExecutions) : 0.0);
 	}
 	
 	/* The last column is the average metabolism per cell execution */
-	printf(",%.4f\n",(statCounter.cellExecutions > 0.0) ? (totalMetabolism / statCounter.cellExecutions) : 0.0);
+	printf(",%.4f\n",(statCounter->cellExecutions > 0.0) ? (totalMetabolism / statCounter->cellExecutions) : 0.0);
 	fflush(stdout);
 	
 	if ((lastTotalViableReplicators > 0)&&(totalViableReplicators == 0))
