@@ -178,7 +178,7 @@ __device__ static inline void getNeighbor(struct Cell *pond, const uintptr_t x, 
     ret = &pond[newY * POND_SIZE_X + newX];
 }
 
-static void doReport(struct Cell *pond, const uint64_t clock)
+static void doReport(struct Cell *pond, struct *statCounters, const uint64_t clock)
 {
     static uint64_t lastTotalViableReplicators = 0;
     
@@ -451,7 +451,7 @@ int main() {
     // Reset per-report stat counters
     // Declare a device pointer for statCounters
     struct statCounters *d_statCounters;
-    struct statCounters statCounters;
+    struct statCounters *statCounters;
     cudaMalloc(&d_statCounters, sizeof(d_statCounters));
 
 
@@ -466,7 +466,7 @@ int main() {
         }
         cudaMemcpy(&statCounters, d_statCounters, sizeof(statCounters), cudaMemcpyDeviceToHost);
         cudaMemcpy(h_pond, d_pond, POND_SIZE_X * POND_SIZE_Y * sizeof(struct Cell), cudaMemcpyDeviceToHost);
-        doReport(h_pond, n);
+        doReport(h_pond, statCounters, n);
     }
     
 
