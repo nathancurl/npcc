@@ -263,6 +263,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
     int access_pos_used;
     uintptr_t access_neg;
     uintptr_t access_pos;
+    uintptr_t rand;
     if (!(clock % INFLOW_FREQUENCY)) {
         getRandomRollback(1, &x, buffer, in, prngState);
         x = x % POND_SIZE_X;
@@ -274,7 +275,6 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
         pptr->lineage = cellIdCounter;
         pptr->generation = 0;
 #ifdef INFLOW_RATE_VARIATION
-        uintptr_t rand;
         getRandomRollback(1, &rand, buffer, in, prngState);
         pptr->energy += INFLOW_RATE_BASE + (rand % INFLOW_RATE_VARIATION);
 #else
@@ -286,7 +286,7 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
         ++cellIdCounter;
     }
     /* Pick a random cell to execute */
-    getRandomRollback(1,&rand, buffer, in, prngState);
+    getRandomRollback(1, &rand, buffer, in, prngState);
     //
     x = rand % POND_SIZE_X;
     y = ((rand / POND_SIZE_X) >> 1) % POND_SIZE_Y;
