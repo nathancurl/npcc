@@ -410,7 +410,6 @@ __global__ static void run(struct Cell *pond, uintptr_t *buffer, int *in, uint64
             }
         }
     }
-    return (void *)0;
 }
 
 __global__ void initializePond(struct Cell *pond) {
@@ -455,9 +454,9 @@ int main() {
     initializePond<<<POND_SIZE_X, POND_SIZE_Y>>>(d_pond);
 
    // Call the kernel function
-    for (n = 0; n < 1000000; n++){
-        for (m = 0 ; m < REPORT_FREQUENCYl m++){
-            execute<<<1, 1>>>(d_buffer, d_in, d_last_random_number, d_prngState, d_pond);
+    for (int n = 0; n < 1000000; n++){
+        for (int m = 0 ; m < REPORT_FREQUENCY; m++){
+            run<<<1, 1>>>(d_buffer, d_in, d_last_random_number, d_prngState, d_pond);
         }
         doReport(n);
     }
